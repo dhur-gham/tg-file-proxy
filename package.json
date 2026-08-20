@@ -1,0 +1,10 @@
+{
+  "name": "tg-file-proxy",
+  "version": "1.0.0",
+  "description": "Telegram File Proxy — upload files via Bot API, get file_id + preview/download URLs",
+  "dependencies": {
+    "axios": "^1.6.0",
+    "busboy": "^1.6.0",
+    "form-data": "^4.0.0"
+  }
+}

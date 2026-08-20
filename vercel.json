@@ -1,0 +1,9 @@
+{
+  "cleanUrls": true,
+  "rewrites": [
+    { "source": "/upload",        "destination": "/api/upload" },
+    { "source": "/file/:file_id", "destination": "/api/file" },
+    { "source": "/view/:file_id", "destination": "/api/view" },
+    { "source": "/info/:file_id", "destination": "/api/info" }
+  ]
+}

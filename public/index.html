@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Telegram File Proxy</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { min-height:100vh; background:#0d1117; color:#e6edf3; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; display:flex; flex-direction:column; align-items:center; padding:48px 16px 0; }
+    .logo { font-size:40px; margin-bottom:12px; }
+    h1 { font-size:24px; font-weight:700; color:#fff; margin-bottom:6px; }
+    .subtitle { font-size:14px; color:#8b949e; margin-bottom:40px; text-align:center; }
+    .card { background:#161b22; border:1px solid #30363d; border-radius:12px; padding:32px; width:100%; max-width:540px; }
+    .dropzone { border:2px dashed #30363d; border-radius:10px; padding:52px 24px; text-align:center; cursor:pointer; transition:border-color .2s,background .2s; position:relative; }
+    .dropzone:hover,.dropzone.drag-over { border-color:#2ea043; background:rgba(46,160,67,.05); }
+    .dropzone.too-big { border-color:#f85149; background:rgba(248,81,73,.05); }
+    .dropzone input[type=file] { position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%; }
+    .dropzone-icon { font-size:38px; margin-bottom:12px; }
+    .dropzone-label { font-size:15px; color:#8b949e; }
+    .dropzone-label span { color:#58a6ff; }
+    .file-selected { margin-top:10px; font-size:13px; color:#3fb950; font-weight:500; min-height:18px; }
+    .file-selected.error { color:#f85149; }
+    .size-warning { display:none; margin-top:14px; background:rgba(248,81,73,.08); border:1px solid #f8514940; border-radius:8px; padding:12px 16px; font-size:13px; color:#f85149; line-height:1.5; }
+    .size-warning.show { display:block; }
+    .size-warning strong { display:block; margin-bottom:4px; font-size:14px; }
+    .btn { display:block; width:100%; margin-top:20px; padding:13px; background:#238636; color:#fff; border:none; border-radius:8px; font-size:15px; font-weight:600; cursor:pointer; transition:background .2s; }
+    .btn:hover:not(:disabled) { background:#2ea043; }
+    .btn:disabled { background:#21262d; color:#484f58; cursor:not-allowed; }
+    .progress-wrap { margin-top:16px; display:none; }
+    .progress-wrap.show { display:block; }
+    .progress-bar-bg { background:#21262d; border-radius:999px; height:6px; overflow:hidden; }
+    .progress-bar { height:100%; background:#238636; border-radius:999px; width:0%; transition:width .3s; }
+    .progress-label { font-size:12px; color:#8b949e; margin-top:6px; text-align:center; }
+    .result { margin-top:24px; display:none; }
+    .result.show { display:block; }
+    .result-title { font-size:13px; font-weight:600; color:#3fb950; text-transform:uppercase; letter-spacing:.06em; margin-bottom:12px; }
+    .result-box { background:#0d1117; border:1px solid #30363d; border-radius:8px; padding:14px 16px; margin-bottom:10px; }
+    .result-box label { font-size:11px; color:#8b949e; display:block; margin-bottom:4px; text-transform:uppercase; letter-spacing:.05em; }
+    .result-row { display:flex; align-items:center; gap:8px; }
+    .result-value { flex:1; font-size:12px; color:#e6edf3; word-break:break-all; font-family:'SFMono-Regular',Consolas,monospace; }
+    .copy-btn { flex-shrink:0; background:#21262d; border:1px solid #30363d; color:#c9d1d9; border-radius:6px; padding:4px 10px; font-size:12px; cursor:pointer; }
+    .copy-btn:hover { background:#30363d; }
+    .copy-btn.copied { color:#3fb950; border-color:#3fb950; }
+    .action-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:4px; }
+    .action-btn { display:flex; align-items:center; justify-content:center; gap:8px; border-radius:8px; padding:11px 14px; font-size:13px; font-weight:600; text-decoration:none; transition:background .15s; border:1px solid transparent; }
+    .action-btn.view { background:#1f6feb22; border-color:#1f6feb; color:#58a6ff; }
+    .action-btn.view:hover { background:#1f6feb44; }
+    .action-btn.download { background:#23863622; border-color:#238636; color:#3fb950; }
+    .action-btn.download:hover { background:#23863644; }
+    .preview-wrap { margin-top:14px; display:none; border-radius:8px; overflow:hidden; border:1px solid #30363d; }
+    .preview-wrap.show { display:block; }
+    .preview-wrap img,.preview-wrap video { display:block; width:100%; max-height:300px; object-fit:contain; background:#0d1117; }
+    .preview-wrap audio { display:block; width:100%; height:48px; }
+    .meta-row { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+    .pill { background:#21262d; border:1px solid #30363d; border-radius:999px; padding:3px 10px; font-size:12px; color:#8b949e; }
+    .pill span { color:#e6edf3; }
+    .error-box { background:rgba(248,81,73,.08); border:1px solid #f8514940; border-radius:8px; padding:12px 16px; font-size:13px; color:#f85149; margin-top:16px; display:none; }
+    .error-box.show { display:block; }
+    .endpoints { margin-top:32px; width:100%; max-width:540px; }
+    .endpoints h2 { font-size:13px; color:#8b949e; text-transform:uppercase; letter-spacing:.06em; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; }
+    .head-links { display:flex; gap:14px; }
+    .endpoints h2 a { font-size:12px; color:#58a6ff; text-decoration:none; text-transform:none; letter-spacing:0; }
+    .endpoints h2 a:hover { text-decoration:underline; }
+    .ep { display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid #21262d; font-size:13px; }
+    .ep:last-child { border-bottom:none; }
+    .method { flex-shrink:0; font-family:monospace; font-size:11px; font-weight:700; padding:2px 7px; border-radius:4px; }
+    .method.post { background:#388bfd22; color:#58a6ff; }
+    .method.get  { background:#3fb95022; color:#3fb950; }
+    .ep-path { font-family:monospace; color:#e6edf3; }
+    .ep-desc { color:#8b949e; margin-left:auto; font-size:12px; }
+    footer { margin-top:48px; padding:24px 16px; width:100%; text-align:center; border-top:1px solid #21262d; font-size:13px; color:#484f58; }
+    footer a { color:#58a6ff; text-decoration:none; font-weight:500; }
+    footer a:hover { text-decoration:underline; }
+  </style>
+</head>
+<body>
+  <div class="logo">✈️</div>
+  <h1>Telegram File Proxy</h1>
+  <p class="subtitle">Upload any file — get a permanent <code style="color:#58a6ff">file_id</code> · preview or download instantly</p>
+
+  <div class="card">
+    <div class="dropzone" id="dropzone">
+      <input type="file" id="fileInput" />
+      <div class="dropzone-icon" id="dropIcon">📎</div>
+      <div class="dropzone-label">Drop your file here or <span>browse</span></div>
+      <div class="dropzone-label" style="font-size:12px;margin-top:4px;color:#484f58">Max <strong style="color:#8b949e">50 MB</strong> · Telegram Bot API limit</div>
+      <div class="file-selected" id="fileSelected"></div>
+    </div>
+
+    <div class="size-warning" id="sizeWarning">
+      <strong>⚠️ File too large for Bot API</strong>
+      The Telegram Bot API only accepts files up to <strong>50 MB</strong>.
+      Your file is <span id="warnSize"></span>. To upload larger files, use the Telegram desktop/mobile app directly.
+    </div>
+
+    <button class="btn" id="uploadBtn" disabled>Upload to Telegram</button>
+
+    <div class="progress-wrap" id="progressWrap">
+      <div class="progress-bar-bg"><div class="progress-bar" id="progressBar"></div></div>
+      <div class="progress-label" id="progressLabel">Uploading…</div>
+    </div>
+
+    <div class="error-box" id="errorBox"></div>
+
+    <div class="result" id="result">
+      <div class="result-title">✅ Upload Successful</div>
+      <div class="preview-wrap" id="previewWrap"></div>
+
+      <div class="result-box" style="margin-top:12px">
+        <label>👁️ Preview URL <span style="color:#484f58;font-weight:400;text-transform:none">(opens in browser)</span></label>
+        <div class="result-row">
+          <span class="result-value" id="resViewUrl"></span>
+          <button class="copy-btn" onclick="copyVal('resViewUrl',this)">Copy</button>
+        </div>
+      </div>
+      <div class="result-box">
+        <label>⬇️ Download URL <span style="color:#484f58;font-weight:400;text-transform:none">(forces download)</span></label>
+        <div class="result-row">
+          <span class="result-value" id="resFileUrl"></span>
+          <button class="copy-btn" onclick="copyVal('resFileUrl',this)">Copy</button>
+        </div>
+      </div>
+      <div class="result-box">
+        <label>file_id</label>
+        <div class="result-row">
+          <span class="result-value" id="resFileId"></span>
+          <button class="copy-btn" onclick="copyVal('resFileId',this)">Copy</button>
+        </div>
+      </div>
+
+      <div class="action-row">
+        <a class="action-btn view"     id="btnView"     href="#" target="_blank">👁️ Preview</a>
+        <a class="action-btn download" id="btnDownload" href="#" target="_blank">⬇️ Download</a>
+      </div>
+
+      <div class="meta-row">
+        <div class="pill">Name: <span id="metaName"></span></div>
+        <div class="pill">Size: <span id="metaSize"></span></div>
+        <div class="pill">Type: <span id="metaType"></span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="endpoints">
+    <h2>API Endpoints
+      <span class="head-links">
+        <a href="https://github.com/dhur-gham/tg-file-proxy" target="_blank">GitHub ↗</a>
+        <a href="/docs">Full API docs →</a>
+      </span>
+    </h2>
+    <div class="ep"><span class="method post">POST</span><span class="ep-path">/upload</span><span class="ep-desc">Upload → file_id</span></div>
+    <div class="ep"><span class="method get">GET</span><span class="ep-path">/view/:file_id</span><span class="ep-desc">Inline preview</span></div>
+    <div class="ep"><span class="method get">GET</span><span class="ep-path">/file/:file_id</span><span class="ep-desc">Force download</span></div>
+    <div class="ep"><span class="method get">GET</span><span class="ep-path">/info/:file_id</span><span class="ep-desc">Metadata only</span></div>
+  </div>
+
+  <footer>
+    Built by <a href="https://dhurgham.dev" target="_blank">dhurgham.dev</a>
+    &nbsp;·&nbsp;
+    <a href="https://github.com/dhur-gham/tg-file-proxy" target="_blank">Source on GitHub</a>
+  </footer>
+
+  <script>
+    const MAX = 50 * 1024 * 1024;
+    const dropzone=document.getElementById('dropzone'),fileInput=document.getElementById('fileInput'),
+      fileSelected=document.getElementById('fileSelected'),uploadBtn=document.getElementById('uploadBtn'),
+      progressWrap=document.getElementById('progressWrap'),progressBar=document.getElementById('progressBar'),
+      progressLabel=document.getElementById('progressLabel'),errorBox=document.getElementById('errorBox'),
+      result=document.getElementById('result'),previewWrap=document.getElementById('previewWrap'),
+      sizeWarning=document.getElementById('sizeWarning'),warnSize=document.getElementById('warnSize'),
+      dropIcon=document.getElementById('dropIcon');
+    let selectedFile=null;
+
+    dropzone.addEventListener('dragover',e=>{e.preventDefault();dropzone.classList.add('drag-over');});
+    dropzone.addEventListener('dragleave',()=>dropzone.classList.remove('drag-over'));
+    dropzone.addEventListener('drop',e=>{e.preventDefault();dropzone.classList.remove('drag-over');if(e.dataTransfer.files[0])setFile(e.dataTransfer.files[0]);});
+    fileInput.addEventListener('change',()=>{if(fileInput.files[0])setFile(fileInput.files[0]);});
+
+    function setFile(f){
+      selectedFile=f;
+      result.classList.remove('show');
+      errorBox.classList.remove('show');
+      if(f.size>MAX){
+        fileSelected.textContent=`⚠️ ${f.name}  (${fmt(f.size)})`;
+        fileSelected.classList.add('error');
+        dropzone.classList.add('too-big');
+        dropIcon.textContent='🚫';
+        warnSize.textContent=fmt(f.size);
+        sizeWarning.classList.add('show');
+        uploadBtn.disabled=true;
+      } else {
+        fileSelected.textContent=`${f.name}  (${fmt(f.size)})`;
+        fileSelected.classList.remove('error');
+        dropzone.classList.remove('too-big');
+        dropIcon.textContent='📎';
+        sizeWarning.classList.remove('show');
+        uploadBtn.disabled=false;
+      }
+    }
+
+    uploadBtn.addEventListener('click',()=>{
+      if(!selectedFile||selectedFile.size>MAX)return;
+      uploadBtn.disabled=true;
+      errorBox.classList.remove('show');
+      result.classList.remove('show');
+      progressWrap.classList.add('show');
+      progressBar.style.width='0%';
+      progressLabel.textContent='Uploading…';
+      const fd=new FormData();
+      fd.append('file',selectedFile);
+      const xhr=new XMLHttpRequest();
+      xhr.open('POST','/upload');
+      xhr.upload.addEventListener('progress',e=>{
+        if(e.lengthComputable){const p=Math.round(e.loaded/e.total*90);progressBar.style.width=p+'%';progressLabel.textContent=`Uploading… ${p}%`;}
+      });
+      xhr.onload=()=>{
+        progressBar.style.width='100%';progressLabel.textContent='Processing…';
+        let data;try{data=JSON.parse(xhr.responseText);}catch{data={ok:false,error:'Invalid response'};}
+        setTimeout(()=>{
+          progressWrap.classList.remove('show');
+          data.ok?showResult(data):showError(data.error||'Upload failed');
+          uploadBtn.disabled=false;
+        },350);
+      };
+      xhr.onerror=()=>{progressWrap.classList.remove('show');showError('Network error.');uploadBtn.disabled=false;};
+      xhr.send(fd);
+    });
+
+    function showResult(d){
+      const base=location.origin;
+      const viewUrl=`${base}/view/${d.file_id}`;
+      const fileUrl=`${base}/file/${d.file_id}`;
+      document.getElementById('resViewUrl').textContent=viewUrl;
+      document.getElementById('resFileUrl').textContent=fileUrl;
+      document.getElementById('resFileId').textContent=d.file_id;
+      document.getElementById('btnView').href=viewUrl;
+      document.getElementById('btnDownload').href=fileUrl;
+      document.getElementById('metaName').textContent=d.file_name||'—';
+      document.getElementById('metaSize').textContent=fmt(d.file_size);
+      document.getElementById('metaType').textContent=d.mime_type||'—';
+      previewWrap.innerHTML='';
+      const mt=d.mime_type||'';
+      if(mt.startsWith('image/')){
+        const img=document.createElement('img');img.src=viewUrl;img.alt='preview';
+        previewWrap.appendChild(img);previewWrap.classList.add('show');
+      }else if(mt.startsWith('video/')){
+        const v=document.createElement('video');v.src=viewUrl;v.controls=true;
+        previewWrap.appendChild(v);previewWrap.classList.add('show');
+      }else if(mt.startsWith('audio/')){
+        const a=document.createElement('audio');a.src=viewUrl;a.controls=true;
+        previewWrap.appendChild(a);previewWrap.classList.add('show');
+      }else{previewWrap.classList.remove('show');}
+      result.classList.add('show');
+    }
+    function showError(msg){errorBox.textContent='❌  '+msg;errorBox.classList.add('show');}
+    function fmt(b){if(!b)return'?';if(b<1024)return b+' B';if(b<1048576)return(b/1024).toFixed(1)+' KB';if(b<1073741824)return(b/1048576).toFixed(2)+' MB';return(b/1073741824).toFixed(2)+' GB';}
+    function copyVal(id,btn){
+      navigator.clipboard.writeText(document.getElementById(id).textContent).then(()=>{
+        btn.textContent='Copied!';btn.classList.add('copied');
+        setTimeout(()=>{btn.textContent='Copy';btn.classList.remove('copied');},2000);
+      });
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,403 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Telegram File Proxy API",
+    "description": "A lightweight middleware that uses your Telegram bot as a free file storage backend. Upload any file → get a permanent `file_id` → preview or download via clean URLs.",
+    "version": "1.0.0",
+    "contact": {
+      "name": "dhurgham.dev",
+      "url": "https://dhurgham.dev"
+    }
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "Current host"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Upload",
+      "description": "Send files to Telegram storage"
+    },
+    {
+      "name": "Retrieve",
+      "description": "Get files back by file_id"
+    }
+  ],
+  "paths": {
+    "/upload": {
+      "post": {
+        "tags": [
+          "Upload"
+        ],
+        "summary": "Upload a file",
+        "description": "Upload any file (max 50 MB). The file is sent to Telegram via the Bot API and stored permanently. Returns the `file_id` and metadata.",
+        "operationId": "uploadFile",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "file"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "The file to upload (max 50 MB)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "File uploaded successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadSuccess"
+                },
+                "example": {
+                  "ok": true,
+                  "file_id": "AgACAgQAAxkDAAPQaoeECyJJIGus",
+                  "file_unique_id": "AQADSomeUniqueId",
+                  "file_size": 204800,
+                  "mime_type": "image/jpeg",
+                  "file_name": "photo.jpg"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          },
+          "502": {
+            "$ref": "#/components/responses/TelegramError"
+          }
+        }
+      }
+    },
+    "/view/{file_id}": {
+      "get": {
+        "tags": [
+          "Retrieve"
+        ],
+        "summary": "Preview a file inline",
+        "description": "Streams the file with `Content-Disposition: inline` so the browser opens and renders it (images, videos, PDFs, audio). Uses `Content-Type` sniffing from file extension when Telegram returns a generic type.",
+        "operationId": "viewFile",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/file_id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "File bytes streamed inline",
+            "headers": {
+              "Content-Type": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Detected MIME type (e.g. image/jpeg)"
+              },
+              "Content-Disposition": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "inline; filename=\"...\""
+              },
+              "Content-Length": {
+                "schema": {
+                  "type": "integer"
+                },
+                "description": "File size in bytes"
+              },
+              "Cache-Control": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "public, max-age=3600"
+              },
+              "X-File-Unique-Id": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Telegram file_unique_id"
+              }
+            },
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "502": {
+            "$ref": "#/components/responses/TelegramError"
+          }
+        }
+      }
+    },
+    "/file/{file_id}": {
+      "get": {
+        "tags": [
+          "Retrieve"
+        ],
+        "summary": "Download a file",
+        "description": "Streams the file with `Content-Disposition: attachment` so the browser saves it to disk immediately.",
+        "operationId": "downloadFile",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/file_id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "File bytes streamed as download",
+            "headers": {
+              "Content-Type": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Content-Disposition": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "attachment; filename=\"...\""
+              },
+              "Content-Length": {
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-File-Unique-Id": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "502": {
+            "$ref": "#/components/responses/TelegramError"
+          }
+        }
+      }
+    },
+    "/info/{file_id}": {
+      "get": {
+        "tags": [
+          "Retrieve"
+        ],
+        "summary": "Get file metadata",
+        "description": "Calls Telegram's `getFile` and returns metadata only — no file bytes. Useful to check if a `file_id` is still valid or to get the `file_path`.",
+        "operationId": "getFileInfo",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/file_id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "File metadata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileInfo"
+                },
+                "example": {
+                  "ok": true,
+                  "file_id": "AgACAgQAAxkDAAPQaoeECyJJIGus",
+                  "file_unique_id": "AQADSomeUniqueId",
+                  "file_size": 204800,
+                  "file_path": "photos/file_123.jpg"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "502": {
+            "$ref": "#/components/responses/TelegramError"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "parameters": {
+      "file_id": {
+        "name": "file_id",
+        "in": "path",
+        "required": true,
+        "description": "Telegram file_id returned from /upload",
+        "schema": {
+          "type": "string",
+          "example": "AgACAgQAAxkDAAPQaoeECyJJIGus"
+        }
+      }
+    },
+    "schemas": {
+      "UploadSuccess": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "example": true
+          },
+          "file_id": {
+            "type": "string",
+            "description": "Use this to preview, download, or reference the file later"
+          },
+          "file_unique_id": {
+            "type": "string",
+            "description": "Stable identifier — same across bots, cannot be used to download"
+          },
+          "file_size": {
+            "type": "integer",
+            "description": "Size in bytes"
+          },
+          "mime_type": {
+            "type": "string",
+            "example": "image/jpeg"
+          },
+          "file_name": {
+            "type": "string",
+            "example": "photo.jpg"
+          }
+        }
+      },
+      "FileInfo": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "file_id": {
+            "type": "string"
+          },
+          "file_unique_id": {
+            "type": "string"
+          },
+          "file_size": {
+            "type": "integer"
+          },
+          "file_path": {
+            "type": "string",
+            "description": "Relative path on Telegram CDN (used internally)"
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "example": false
+          },
+          "error": {
+            "type": "string",
+            "example": "Missing file_id."
+          }
+        }
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "Bad request — missing or invalid parameter",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "File not found on Telegram",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "TooLarge": {
+        "description": "File exceeds 50 MB Telegram Bot API limit",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "Unprocessable": {
+        "description": "file_path unavailable — file may exceed 20 MB download limit",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "TelegramError": {
+        "description": "Telegram API returned an error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      }
+    }
+  }
+}
