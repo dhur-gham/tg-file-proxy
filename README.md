@@ -92,6 +92,32 @@ https://tg-file-proxy.vercel.app/file/AgACAgQAAxkD...   ⬇️ downloads
 
 ---
 
+## ⚠️ Scaling for heavy use
+
+This setup is built for personal or low-volume use — one bot writing into one chat. That is fine for a few uploads a day. Push real traffic through it and Telegram will start throttling you, and eventually ban the bot.
+
+Telegram enforces per-bot rate limits, and file uploads are among the most expensive calls you can make:
+
+| Limit | Approximate value |
+|-------|-------------------|
+| Messages to one chat | ~1 per second sustained |
+| Total messages across all chats | ~30 per second |
+| Bulk sending to one chat | ~20 per minute |
+
+Cross those and the API replies `429 Too Many Requests` with a `retry_after` value. Ignore the backoff and keep hammering, and Telegram escalates: longer cooldowns, then a permanent ban on the bot token. Bans apply to the bot, not just the request — everything already uploaded through it becomes unreachable, because `getFile` stops working for that token. There is no paid tier that lifts these limits.
+
+For heavy use you need more than one bot, and you need to send to more than one chat. Each bot carries its own quota, and the per-chat limit is stricter than the global one, so spreading load across both dimensions is what keeps you under the ceiling.
+
+Note that a `file_id` only works with the bot token that created it. Once you use more than one bot, each file has to be served back through the same bot that uploaded it, so that pairing has to be recorded and kept.
+
+Deleting a storage message invalidates its `file_id` permanently.
+
+As shipped, `/upload` is public and unauthenticated — anyone who finds the URL can write into your chats and burn your quota.
+
+Telegram is a messaging service, not a CDN. Using it as bulk file hosting runs against the spirit of the terms, and sustained abuse gets bots banned. For anything serious, use S3, R2, or B2.
+
+---
+
 ## Built by
 
 [dhurgham.dev](https://dhurgham.dev)
